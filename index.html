@@ -4,6 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>India Land Unit Converter</title>
+  
+  <!-- React & ReactDOM (UMD) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel Standalone for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
   <style>
     :root {
       --primary: #2563eb;
@@ -117,18 +125,611 @@
       }
     }
   </style>
-<script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
-  }
-}
-</script>
 </head>
 <body>
   <div id="root"></div>
-  <script type="module" src="./index.tsx"></script>
+
+  <script type="text/babel">
+    const { useState, useMemo, useEffect } = React;
+    const { createRoot } = ReactDOM;
+
+    // --- Data ---
+    const standardUnits = {
+      "Square Foot": 1,
+      "Square Meter": 10.7639,
+      "Square Yard (Gaj)": 9,
+      "Acre": 43560,
+      "Hectare": 107639,
+    };
+
+    // Helper to format numbers nicely
+    const fmt = (n) => n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+
+    const landData = {
+      "Standard / All India": {
+        units: ["Acre", "Hectare", "Square Foot", "Square Meter", "Square Yard (Gaj)"],
+        factors: { ...standardUnits },
+        notes: "Standard metric and imperial units used widely across India.",
+      },
+      Haryana: {
+        units: ["Acre", "Kanal", "Marla", "Biswa", "Bigha"],
+        factors: {
+          ...standardUnits,
+          Kanal: 5445,
+          Marla: 272.25,
+          Bigha: 27225, // Pucca
+          Biswa: 1361.25,
+        },
+        notes: "Commonly uses the Kanal-Marla system. 8 Kanals = 1 Acre.",
+      },
+      Punjab: {
+        units: ["Acre", "Kanal", "Marla", "Biswa", "Bigha"],
+        factors: {
+          ...standardUnits,
+          Kanal: 5445,
+          Marla: 272.25,
+          Bigha: 27225,
+          Biswa: 1361.25,
+        },
+        notes: "Similar to Haryana. 1 Acre = 8 Kanals = 160 Marlas.",
+      },
+      Delhi: {
+        units: ["Acre", "Bigha", "Biswa", "Square Yard"],
+        factors: {
+          ...standardUnits,
+          Bigha: 27225,
+          Biswa: 1361.25,
+        },
+        notes: "Urban areas use Sq Yards/Meters. Rural areas use Bigha (Standard Pucca assumed).",
+      },
+      "Uttar Pradesh": {
+        units: ["Bigha", "Biswa", "Kattha", "Decimal"],
+        factors: {
+          ...standardUnits,
+          Bigha: 27225,
+          Biswa: 1361.25,
+          Kattha: 1361.25,
+          Decimal: 435.6,
+        },
+        notes: "1 Bigha (Pucca) = 20 Biswa. 1 Biswa often equals 1 Kattha here.",
+      },
+      Uttarakhand: {
+        units: ["Bigha", "Biswa", "Nali"],
+        factors: {
+          ...standardUnits,
+          Bigha: 10890,
+          Biswa: 544.5,
+          Nali: 2160,
+        },
+        notes: "Hill units: 1 Bigha ≈ 10,890 sq ft. 1 Nali ≈ 2,160 sq ft (240 sq yards).",
+      },
+      "Himachal Pradesh": {
+        units: ["Bigha", "Biswa", "Kanal", "Marla"],
+        factors: {
+          ...standardUnits,
+          Bigha: 10890,
+          Biswa: 544.5,
+          Kanal: 5445,
+          Marla: 272.25,
+        },
+        notes: "1 Bigha = 20 Biswa. 1 Biswa = 45 Sq Yards.",
+      },
+      "Jammu & Kashmir": {
+        units: ["Kanal", "Marla", "Bigha"],
+        factors: {
+          ...standardUnits,
+          Kanal: 5445,
+          Marla: 272.25,
+          Bigha: 10890,
+        },
+        notes: "Primary unit is Kanal. 1 Kanal = 20 Marlas.",
+      },
+      "Andhra Pradesh": {
+        units: ["Acre", "Cent", "Gunta", "Ankanam", "Kuncham"],
+        factors: {
+          ...standardUnits,
+          Cent: 435.6,
+          Gunta: 1089,
+          Ankanam: 72,
+          Kuncham: 4356,
+        },
+        notes: "1 Acre = 100 Cents. 1 Gunta = 1089 Sq Ft.",
+      },
+      Telangana: {
+        units: ["Acre", "Gunta", "Cent", "Ankanam"],
+        factors: {
+          ...standardUnits,
+          Gunta: 1089,
+          Cent: 435.6,
+          Ankanam: 72,
+        },
+        notes: "Land often measured in Guntas. 1 Acre = 40 Guntas.",
+      },
+      "Tamil Nadu": {
+        units: ["Ground", "Cent", "Acre", "Ankanam"],
+        factors: {
+          ...standardUnits,
+          Ground: 2400,
+          Cent: 435.6,
+          Ankanam: 72,
+        },
+        notes: "1 Ground = 2400 Sq Ft (Standard for Chennai plots).",
+      },
+      Karnataka: {
+        units: ["Guntha", "Acre", "Cent", "Ankanam"],
+        factors: {
+          ...standardUnits,
+          Guntha: 1089,
+          Cent: 435.6,
+          Ankanam: 72,
+        },
+        notes: "1 Acre = 40 Gunthas. 1 Guntha = 33ft x 33ft.",
+      },
+      Kerala: {
+        units: ["Cent", "Acre"],
+        factors: {
+          ...standardUnits,
+          Cent: 435.6,
+        },
+        notes: "1 Acre = 100 Cents. 1 Cent = 435.6 Sq Ft.",
+      },
+      Goa: {
+        units: ["Square Meter", "Acre", "Cent"],
+        factors: {
+          ...standardUnits,
+          Cent: 435.6,
+        },
+        notes: "Metric system is official. Cents also used.",
+      },
+      Bihar: {
+        units: ["Bigha", "Kattha", "Dhur", "Decimal"],
+        factors: {
+          ...standardUnits,
+          Bigha: 27225,
+          Kattha: 1361.25,
+          Dhur: 68.06,
+          Decimal: 435.6,
+        },
+        notes: "1 Bigha = 20 Kattha. 1 Kattha = 20 Dhur.",
+      },
+      "West Bengal": {
+        units: ["Bigha", "Katha", "Chatak", "Decimal"],
+        factors: {
+          ...standardUnits,
+          Bigha: 14400,
+          Katha: 720,
+          Chatak: 45,
+          Decimal: 435.6,
+        },
+        notes: "1 Bigha = 20 Katha = 14,400 Sq Ft.",
+      },
+      Jharkhand: {
+        units: ["Bigha", "Kattha", "Dhur", "Decimal"],
+        factors: {
+          ...standardUnits,
+          Bigha: 27225,
+          Kattha: 1361.25,
+          Dhur: 68.06,
+          Decimal: 435.6,
+        },
+        notes: "Similar to Bihar standards.",
+      },
+      Odisha: {
+        units: ["Acre", "Guntha", "Decimal", "Cent"],
+        factors: {
+          ...standardUnits,
+          Guntha: 1089,
+          Decimal: 435.6,
+          Cent: 435.6,
+        },
+        notes: "1 Acre = 100 Decimals.",
+      },
+      Assam: {
+        units: ["Bigha", "Katha", "Lecha"],
+        factors: {
+          ...standardUnits,
+          Bigha: 14400,
+          Katha: 2880,
+          Lecha: 144,
+        },
+        notes: "1 Bigha = 5 Katha. 1 Katha = 20 Lecha.",
+      },
+      Rajasthan: {
+        units: ["Bigha (Pucca)", "Biswa", "Biswansi"],
+        factors: {
+          ...standardUnits,
+          "Bigha (Pucca)": 27225,
+          Biswa: 1361.25,
+          Biswansi: 68.06,
+        },
+        notes: "Pucca Bigha is standard. Kaccha Bigha varies locally.",
+      },
+      Gujarat: {
+        units: ["Bigha", "Vigha", "Guntha", "Acre"],
+        factors: {
+          ...standardUnits,
+          Bigha: 17424,
+          Vigha: 17424,
+          Guntha: 1089,
+        },
+        notes: "1 Bigha/Vigha ≈ 17,424 Sq Ft.",
+      },
+      Maharashtra: {
+        units: ["Guntha", "Acre", "Hectare"],
+        factors: {
+          ...standardUnits,
+          Guntha: 1089,
+        },
+        notes: "1 Acre = 40 Gunthas.",
+      },
+      "Madhya Pradesh": {
+        units: ["Bigha", "Kattha", "Biswa", "Dhur"],
+        factors: {
+          ...standardUnits,
+          Bigha: 12000,
+          Biswa: 600,
+          Kattha: 600,
+          Dhur: 30,
+        },
+        notes: "Bigha varies widely. Approx 12,000 Sq Ft used here.",
+      },
+      "North Eastern States": {
+        units: ["Bigha", "Katha", "Lecha"],
+        factors: {
+          ...standardUnits,
+          Bigha: 14400,
+          Katha: 2880,
+          Lecha: 144,
+        },
+        notes: "Uses similar system to Assam.",
+      },
+      Puducherry: {
+        units: ["Acre", "Cent", "Ground"],
+        factors: {
+          ...standardUnits,
+          Cent: 435.6,
+          Ground: 2400,
+        },
+        notes: "Follows Tamil Nadu system largely.",
+      },
+    };
+
+    const stateGroups = {
+      Tripura: "Assam",
+      Chhattisgarh: "Madhya Pradesh",
+      Chandigarh: "Punjab",
+      Sikkim: "North Eastern States",
+      Nagaland: "North Eastern States",
+      Mizoram: "North Eastern States",
+      "Arunachal Pradesh": "North Eastern States",
+      Meghalaya: "North Eastern States",
+      Manipur: "North Eastern States",
+    };
+
+    // Component to render units grid
+    const UnitGrid = ({ stateName, data }) => {
+      if (!data) return <div style={{ color: "#94a3b8", fontStyle: "italic", textAlign: "center", padding: "20px" }}>Select {stateName} to view units</div>;
+      
+      return (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+            <h3 style={{ margin: 0, color: "#1e293b" }}>{stateName} Units</h3>
+          </div>
+          <p style={{ color: "#64748b", fontSize: "0.9rem", marginBottom: "1rem", minHeight: '2.5rem' }}>{data.notes}</p>
+          
+          <div className="card-grid">
+            {data.units.map((unit) => {
+               const factor = data.factors[unit] || standardUnits[unit];
+               return (
+                <div key={unit} className="unit-card">
+                  <div className="unit-name">{unit}</div>
+                  <div className="unit-value">~ {fmt(factor)} Sq. Ft.</div>
+                  <div className="unit-desc">
+                    1 {unit} = {fmt(factor / 9)} Sq. Yard
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    };
+
+    const App = () => {
+      const [tab, setTab] = useState("single");
+
+      // Single Mode State
+      const [singleState, setSingleState] = useState("");
+      const [singleFrom, setSingleFrom] = useState("Square Foot");
+      const [singleTo, setSingleTo] = useState("Acre");
+      const [singleInput, setSingleInput] = useState("");
+
+      // Compare Mode State
+      const [compState1, setCompState1] = useState("");
+      const [compState2, setCompState2] = useState("");
+      const [compFrom, setCompFrom] = useState("Acre"); // From State 1
+      const [compTo, setCompTo] = useState("Acre");     // To State 2
+      const [compInput, setCompInput] = useState("");
+
+      // --- Logic for Single Mode ---
+      const singleData = useMemo(() => {
+        if (!singleState) return null;
+        return landData[stateGroups[singleState] || singleState];
+      }, [singleState]);
+
+      const singleFactors = useMemo(() => {
+        if (!singleData) return standardUnits;
+        return { ...standardUnits, ...singleData.factors };
+      }, [singleData]);
+
+      const singleUnits = useMemo(() => {
+        if (!singleData) return Object.keys(standardUnits).sort();
+        return Array.from(new Set([...singleData.units, ...Object.keys(standardUnits)])).sort();
+      }, [singleData]);
+
+      useEffect(() => {
+        if (!singleUnits.includes(singleFrom)) setSingleFrom(singleUnits[0]);
+        if (!singleUnits.includes(singleTo)) setSingleTo("Acre");
+      }, [singleUnits]);
+
+      // --- Logic for Compare Mode ---
+      const data1 = useMemo(() => compState1 ? landData[stateGroups[compState1] || compState1] : null, [compState1]);
+      const data2 = useMemo(() => compState2 ? landData[stateGroups[compState2] || compState2] : null, [compState2]);
+
+      const factors1 = useMemo(() => data1 ? { ...standardUnits, ...data1.factors } : standardUnits, [data1]);
+      const factors2 = useMemo(() => data2 ? { ...standardUnits, ...data2.factors } : standardUnits, [data2]);
+
+      const units1 = useMemo(() => data1 ? Array.from(new Set([...data1.units, ...Object.keys(standardUnits)])).sort() : Object.keys(standardUnits).sort(), [data1]);
+      const units2 = useMemo(() => data2 ? Array.from(new Set([...data2.units, ...Object.keys(standardUnits)])).sort() : Object.keys(standardUnits).sort(), [data2]);
+
+      // Intelligent Update: When State 1 or 2 changes, try to keep unit or match logic
+      useEffect(() => {
+        // When state 1 changes, ensure from unit is valid
+        if (!units1.includes(compFrom)) setCompFrom(units1[0]);
+      }, [units1]);
+
+      useEffect(() => {
+        // INTELLIGENT LOGIC: When State 2 changes (or its units load), try to find a unit 
+        // in State 2 that matches the name of the unit currently selected in State 1.
+        // This allows immediate Bigha-to-Bigha comparison.
+        if (units2.includes(compFrom)) {
+            setCompTo(compFrom);
+        } else if (!units2.includes(compTo)) {
+            setCompTo(units2[0]);
+        }
+      }, [units2, compFrom]);
+
+      // Calculation Helpers
+      const convert = (val, fromFactor, toFactor) => {
+        if (typeof val !== "number") return 0;
+        return (val * fromFactor) / toFactor;
+      };
+
+      const singleResult = convert(parseFloat(singleInput) || 0, singleFactors[singleFrom], singleFactors[singleTo]);
+      const compResult = convert(parseFloat(compInput) || 0, factors1[compFrom], factors2[compTo]);
+
+      const allStateNames = Object.keys(landData).concat(Object.keys(stateGroups)).sort();
+
+      return (
+        <div>
+          <header style={{ textAlign: "center", marginBottom: "2rem" }}>
+            <h1 style={{ color: "#2563eb", marginBottom: "0.5rem" }}>Land Converter India</h1>
+            <p style={{ color: "#64748b" }}>State-specific measurements & conversion tool</p>
+          </header>
+
+          <div className="tabs-container">
+            <div className="tabs">
+                <button className={`tab ${tab === 'single' ? 'active' : ''}`} onClick={() => setTab('single')}>Single State</button>
+                <button className={`tab ${tab === 'compare' ? 'active' : ''}`} onClick={() => setTab('compare')}>Compare States</button>
+            </div>
+          </div>
+
+          {tab === 'single' ? (
+            // SINGLE MODE RENDER
+            <>
+                <div style={{ background: "white", padding: "1.5rem", borderRadius: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", marginBottom: "1.5rem" }}>
+                    <label style={{ display: "block", fontWeight: 600, marginBottom: "0.5rem" }}>Select Region / State</label>
+                    <select
+                    value={singleState}
+                    onChange={(e) => setSingleState(e.target.value)}
+                    style={{ width: "100%", padding: "0.75rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "1rem" }}
+                    >
+                    <option value="" disabled>Choose a state...</option>
+                    {allStateNames.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                    ))}
+                    </select>
+                </div>
+
+                {singleData && (
+                     <div style={{marginBottom: "2rem"}}>
+                         <UnitGrid stateName={singleState} data={singleData} />
+                     </div>
+                )}
+
+                <div style={{ background: "white", padding: "1.5rem", borderRadius: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                    <h3 style={{ marginTop: 0, marginBottom: "1.5rem" }}>Calculator</h3>
+                    
+                    <div style={{ marginBottom: "1.5rem" }}>
+                    <label style={{ display: "block", fontWeight: 600, marginBottom: "0.5rem" }}>Value</label>
+                    <input
+                        type="number"
+                        value={singleInput}
+                        onChange={(e) => setSingleInput(e.target.value)}
+                        placeholder="Enter area..."
+                        style={{ width: "100%", padding: "0.75rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "1rem", boxSizing: "border-box" }}
+                    />
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
+                    <div>
+                        <label style={{ display: "block", fontWeight: 600, marginBottom: "0.5rem" }}>From</label>
+                        <select
+                        value={singleFrom}
+                        onChange={(e) => setSingleFrom(e.target.value)}
+                        style={{ width: "100%", padding: "0.75rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "1rem", boxSizing: "border-box" }}
+                        >
+                        {singleUnits.map((u) => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ display: "block", fontWeight: 600, marginBottom: "0.5rem" }}>To</label>
+                        <select
+                        value={singleTo}
+                        onChange={(e) => setSingleTo(e.target.value)}
+                        style={{ width: "100%", padding: "0.75rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "1rem", boxSizing: "border-box" }}
+                        >
+                        {singleUnits.map((u) => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                    </div>
+                    </div>
+
+                    <div style={{ background: "#eff6ff", padding: "1.5rem", borderRadius: "0.75rem", textAlign: "center", border: "1px solid #bfdbfe" }}>
+                    <div style={{ fontSize: "0.9rem", color: "#64748b", marginBottom: "0.5rem" }}>Result</div>
+                    <div style={{ fontSize: "2rem", fontWeight: 800, color: "#1e40af", wordBreak: "break-all" }}>
+                        {singleResult === 0 ? "0" : singleResult < 0.01 ? singleResult.toExponential(4) : singleResult.toLocaleString("en-IN", { maximumFractionDigits: 4 })}
+                    </div>
+                    <div style={{ color: "#64748b", marginTop: "0.5rem" }}>{singleTo}</div>
+                    </div>
+                </div>
+            </>
+          ) : (
+            // COMPARE MODE RENDER
+            <>
+                 <div style={{ background: "white", padding: "1.5rem", borderRadius: "1rem", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", marginBottom: "1.5rem" }}>
+                    <h3 style={{marginTop: 0, marginBottom: "1rem"}}>Cross-State Calculator</h3>
+                    <p style={{fontSize: "0.9rem", color: "#64748b", marginBottom: "1.5rem"}}>
+                        Convert units directly from one state to another. Selecting a unit in the left state will attempt to auto-select the equivalent unit name in the right state for direct comparison.
+                    </p>
+                    
+                    <div style={{ marginBottom: "1.5rem" }}>
+                        <label style={{ display: "block", fontWeight: 600, marginBottom: "0.5rem" }}>Value to Convert</label>
+                        <input
+                            type="number"
+                            value={compInput}
+                            onChange={(e) => setCompInput(e.target.value)}
+                            placeholder="Enter value..."
+                            style={{ width: "100%", padding: "0.75rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "1rem", boxSizing: "border-box" }}
+                        />
+                    </div>
+
+                    <div className="split-view" style={{marginBottom: "1.5rem"}}>
+                         {/* Left Side Controls */}
+                         <div>
+                            <label style={{ display: "block", fontWeight: 600, marginBottom: "0.5rem", color: "#2563eb" }}>From State (Region A)</label>
+                            <select
+                                value={compState1}
+                                onChange={(e) => setCompState1(e.target.value)}
+                                style={{ width: "100%", padding: "0.75rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "1rem", marginBottom: "1rem" }}
+                            >
+                                <option value="" disabled>Select State A...</option>
+                                {allStateNames.map((s) => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
+                            
+                            <label style={{ display: "block", fontWeight: 600, marginBottom: "0.5rem" }}>Unit</label>
+                            <select
+                                value={compFrom}
+                                onChange={(e) => setCompFrom(e.target.value)}
+                                style={{ width: "100%", padding: "0.75rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "1rem" }}
+                            >
+                                {units1.map((u) => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                         </div>
+
+                         {/* Right Side Controls */}
+                         <div>
+                            <label style={{ display: "block", fontWeight: 600, marginBottom: "0.5rem", color: "#2563eb" }}>To State (Region B)</label>
+                            <select
+                                value={compState2}
+                                onChange={(e) => setCompState2(e.target.value)}
+                                style={{ width: "100%", padding: "0.75rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "1rem", marginBottom: "1rem" }}
+                            >
+                                <option value="" disabled>Select State B...</option>
+                                {allStateNames.map((s) => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
+                            
+                            <label style={{ display: "block", fontWeight: 600, marginBottom: "0.5rem" }}>Unit</label>
+                            <select
+                                value={compTo}
+                                onChange={(e) => setCompTo(e.target.value)}
+                                style={{ width: "100%", padding: "0.75rem", borderRadius: "0.5rem", border: "1px solid #cbd5e1", fontSize: "1rem" }}
+                            >
+                                {units2.map((u) => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                         </div>
+                    </div>
+
+                    <div style={{ background: "#eff6ff", padding: "1.5rem", borderRadius: "0.75rem", textAlign: "center", border: "1px solid #bfdbfe" }}>
+                        <div style={{ fontSize: "0.9rem", color: "#64748b", marginBottom: "0.5rem" }}>Conversion Result</div>
+                        <div style={{ fontSize: "2rem", fontWeight: 800, color: "#1e40af", wordBreak: "break-all" }}>
+                            {compResult === 0 ? "0" : compResult < 0.01 ? compResult.toExponential(4) : compResult.toLocaleString("en-IN", { maximumFractionDigits: 4 })}
+                        </div>
+                        <div style={{ color: "#64748b", marginTop: "0.5rem" }}>{compTo} (in {compState2 || "State B"})</div>
+                    </div>
+
+                    {compState1 && compState2 && (
+                        <div style={{ marginTop: "1rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                            <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0", textAlign: "center" }}>
+                                <div style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "4px" }}>1 {compFrom} ({compState1})</div>
+                                <div style={{ fontSize: "1rem", fontWeight: 600, color: "#334155" }}>≈ {fmt(factors1[compFrom])} Sq. Ft</div>
+                            </div>
+                            <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0", textAlign: "center" }}>
+                                <div style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "4px" }}>1 {compTo} ({compState2})</div>
+                                <div style={{ fontSize: "1rem", fontWeight: 600, color: "#334155" }}>≈ {fmt(factors2[compTo])} Sq. Ft</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {(data1 || data2) && (
+                        <div className="split-view" style={{ marginTop: "1.5rem" }}>
+                            {data1 ? (
+                                <div style={{ background: "#f8fafc", padding: "1rem", borderRadius: "0.5rem", border: "1px solid #e2e8f0" }}>
+                                    <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "#64748b", fontWeight: 700, marginBottom: "0.25rem" }}>
+                                        {compState1} Notes
+                                    </div>
+                                    <div style={{ fontSize: "0.85rem", color: "#334155" }}>
+                                        {data1.notes}
+                                    </div>
+                                </div>
+                            ) : <div />}
+                            {data2 ? (
+                                <div style={{ background: "#f8fafc", padding: "1rem", borderRadius: "0.5rem", border: "1px solid #e2e8f0" }}>
+                                    <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "#64748b", fontWeight: 700, marginBottom: "0.25rem" }}>
+                                        {compState2} Notes
+                                    </div>
+                                    <div style={{ fontSize: "0.85rem", color: "#334155" }}>
+                                        {data2.notes}
+                                    </div>
+                                </div>
+                            ) : <div />}
+                        </div>
+                    )}
+                </div>
+
+                <div className="split-view">
+                    <div>
+                         <UnitGrid stateName={compState1 || "State A"} data={data1} />
+                    </div>
+                    <div>
+                         <UnitGrid stateName={compState2 || "State B"} data={data2} />
+                    </div>
+                </div>
+            </>
+          )}
+
+          <footer style={{ marginTop: "3rem", textAlign: "center", fontSize: "0.8rem", color: "#94a3b8", paddingBottom: "1rem" }}>
+            <p><strong>Disclaimer:</strong> Land measurement units vary significantly by district (Kachha vs Pucca). Conversions provided are estimates. Verify with local revenue authorities for official transactions.</p>
+          </footer>
+        </div>
+      );
+    };
+
+    const root = createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
 </body>
 </html>
